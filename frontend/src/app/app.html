@@ -1,0 +1,200 @@
+﻿<main class="app-shell">
+  <section class="panel">
+    <div class="header">
+      <p class="eyebrow">SkyPilot Operations</p>
+      <h1>Gestão de operações aéreas</h1>
+    </div>
+
+    <div *ngIf="!isAuthenticated" class="auth-card card">
+      <h2>Autenticação</h2>
+      <div class="field-group">
+        <label for="username">Usuário</label>
+        <input id="username" type="text" [(ngModel)]="username" placeholder="Digite seu usuário" />
+      </div>
+
+      <div class="field-group">
+        <label for="password">Senha</label>
+        <input id="password" type="password" [(ngModel)]="password" placeholder="Digite sua senha" />
+      </div>
+
+      <div class="auth-actions">
+        <button type="button" class="primary" (click)="loginUser()">Entrar</button>
+        <button type="button" class="secondary" (click)="registerUser()">Cadastrar</button>
+      </div>
+
+      <div *ngIf="errorMessage" class="error-box">{{ errorMessage }}</div>
+      <div *ngIf="successMessage" class="success-box">{{ successMessage }}</div>
+    </div>
+
+    <div *ngIf="isAuthenticated">
+      <div class="topbar">
+        <span>Operador autenticado: <strong>{{ username }}</strong></span>
+        <button type="button" class="logout" (click)="logout()">Sair</button>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span>Companhias</span>
+          <strong>{{ dashboard.airlines }}</strong>
+        </div>
+        <div class="stat-card">
+          <span>Aeronaves</span>
+          <strong>{{ dashboard.aircraft }}</strong>
+        </div>
+        <div class="stat-card">
+          <span>Rotas</span>
+          <strong>{{ dashboard.routes }}</strong>
+        </div>
+        <div class="stat-card">
+          <span>Ofertas</span>
+          <strong>{{ dashboard.offers }}</strong>
+        </div>
+        <div class="stat-card warning">
+          <span>Pendentes</span>
+          <strong>{{ dashboard.pendingOffers }}</strong>
+        </div>
+        <div class="stat-card success">
+          <span>Aceitas</span>
+          <strong>{{ dashboard.acceptedOffers }}</strong>
+        </div>
+        <div class="stat-card danger">
+          <span>Rejeitadas</span>
+          <strong>{{ dashboard.rejectedOffers }}</strong>
+        </div>
+        <div class="stat-card info">
+          <span>Prontas p/ despacho</span>
+          <strong>{{ dashboard.dispatchReadyOffers }}</strong>
+        </div>
+      </div>
+
+      <div class="content-grid">
+        <div class="card">
+          <h2>Nova oferta de voo</h2>
+
+          <div class="field-group">
+            <label for="routeSelect">Rota</label>
+            <select id="routeSelect" [(ngModel)]="selectedRouteId">
+              <option *ngFor="let route of routes" [value]="route.id">
+                {{ route.origin.code }} → {{ route.destination.code }} · {{ route.distanceKm }} km
+              </option>
+            </select>
+          </div>
+
+          <div class="field-group">
+            <label for="aircraftSelect">Aeronave</label>
+            <select id="aircraftSelect" [(ngModel)]="selectedAircraftId">
+              <option *ngFor="let aircraft of aircraftList" [value]="aircraft.id">
+                {{ aircraft.registration }} · {{ aircraft.aircraftType?.model || 'A320' }}
+              </option>
+            </select>
+          </div>
+
+          <div class="field-group split-row">
+            <div>
+              <label for="offerDate">Data</label>
+              <input id="offerDate" type="date" [(ngModel)]="offerDate" />
+            </div>
+
+            <div>
+              <label for="departureTime">Partida</label>
+              <input id="departureTime" type="time" [(ngModel)]="departureTime" />
+            </div>
+          </div>
+
+          <button class="primary" type="button" (click)="createOffer()">Criar oferta</button>
+        </div>
+
+        <div class="card">
+          <h2>Catálogo</h2>
+
+          <div class="mini-list">
+            <div *ngFor="let airline of airlines" class="mini-card">
+              <strong>{{ airline.name }}</strong>
+              <span>{{ airline.iata }} / {{ airline.icao }}</span>
+              <small>{{ airline.baseCity }} · {{ airline.mainAirportCode }}</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card table-card">
+        <div class="table-header">
+          <h2>Ofertas de voo</h2>
+          <div class="filter-row">
+            <div class="field-group compact">
+              <label for="statusFilter">Status</label>
+              <select id="statusFilter" [(ngModel)]="selectedStatusFilter">
+                <option value="ALL">Todos</option>
+                <option value="PENDING">Pendentes</option>
+                <option value="ACCEPTED">Aceitas</option>
+                <option value="REJECTED">Rejeitadas</option>
+              </select>
+            </div>
+
+            <div class="field-group compact">
+              <label for="routeFilter">Rota</label>
+              <select id="routeFilter" [(ngModel)]="selectedRouteFilter">
+                <option value="ALL">Todas</option>
+                <option *ngFor="let route of routes" [value]="route.id">
+                  {{ route.origin.code }} → {{ route.destination.code }}
+                </option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Rota</th>
+              <th>Data</th>
+              <th>Partida</th>
+              <th>Aeronave</th>
+              <th>Status</th>
+              <th>Ação</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let offer of filteredOffers">
+              <td>{{ offer.route.origin.code }} → {{ offer.route.destination.code }}</td>
+              <td>{{ formatDate(offer.date) }}</td>
+              <td>{{ offer.departureTime }}</td>
+              <td>{{ offer.aircraft.registration }}</td>
+              <td>
+                <span class="status-badge" [class.pending]="offer.status === 'PENDING'" [class.accepted]="offer.status === 'ACCEPTED'" [class.rejected]="offer.status === 'REJECTED'">
+                  {{ offer.status }}
+                </span>
+              </td>
+              <td class="action-cell">
+                <button type="button" class="accept" (click)="updateOfferStatus(offer.id, 'ACCEPTED')">Aceitar</button>
+                <button type="button" class="reject" (click)="updateOfferStatus(offer.id, 'REJECTED')">Rejeitar</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2>Board de despacho</h2>
+        <div class="dispatch-list">
+          <div *ngFor="let item of dispatchBoard" class="dispatch-item" [class.ready]="item.dispatchReady">
+            <div class="dispatch-main">
+              <strong>{{ item.routeCode }}</strong>
+              <span>{{ item.aircraftRegistration }}</span>
+            </div>
+            <small>{{ item.flightWindow }}</small>
+            <div class="dispatch-meta">
+              <span class="status-badge" [class.pending]="item.status === 'PENDING'" [class.accepted]="item.status === 'ACCEPTED'" [class.rejected]="item.status === 'REJECTED'">
+                {{ item.status }}
+              </span>
+              <span class="ready-pill" *ngIf="item.dispatchReady">Pronta</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div *ngIf="errorMessage" class="error-box">{{ errorMessage }}</div>
+    <div *ngIf="successMessage" class="success-box">{{ successMessage }}</div>
+  </section>
+</main>

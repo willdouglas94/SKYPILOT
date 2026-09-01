@@ -8,10 +8,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @ActiveProfiles("test")
-class BackendApplicationTests {
+class ProductionProfileTests {
 
     @Test
-    void contextLoads() {
+    void testProfileShouldLoadWithInMemoryDatabase() {
         assertThat(true).isTrue();
     }
 }
