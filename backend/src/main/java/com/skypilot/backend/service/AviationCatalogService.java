@@ -33,7 +33,8 @@ public class AviationCatalogService {
     public AviationCatalogService() {
         this(new PilotPerformanceService(), new ExternalFlightDataService(
                 new com.skypilot.backend.aviation.client.FlightAwareClient("", ""),
-                new com.skypilot.backend.aviation.mapper.FlightAwareMapper()
+                new com.skypilot.backend.aviation.mapper.FlightAwareMapper(),
+                null
         ));
     }
 

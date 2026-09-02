@@ -6,3 +6,24 @@ target/
 node_modules/
 dist/
 .DS_Store
+
+# Sensitive local environment and deployment files
+.env
+.env.*
+*.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# Sensitive project documents that must not be public
+README.md
+skypilot_simulator_plano_negocio.txt
+azure-deploy.md
+
+# Common secret/key material
+*.pem
+*.key
+*.crt
+*.p12
+*.jks

@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: skypilot-backend
+    runtime: docker
+    rootDir: backend
+    plan: free
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: PORT
+        value: 8080
+      - key: DB_URL
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://*.vercel.app
+      - key: AVIATION_DATA_PROVIDER
+        value: demo
+      - key: AVIATION_DATA_BASE_URL
+        value: ""
+      - key: FLIGHTAWARE_API_KEY
+        value: ""

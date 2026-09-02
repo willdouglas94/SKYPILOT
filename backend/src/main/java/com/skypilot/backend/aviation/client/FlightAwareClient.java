@@ -8,9 +8,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,14 +39,22 @@ public class FlightAwareClient {
     }
 
     public List<FlightAwareRoute> fetchRoutes() {
-        String url = resolveRoutesUrl();
+        return fetchRoutesForAirport("GRU");
+    }
+
+    public List<FlightAwareRoute> fetchRoutesForAirport(String airportCode) {
+        if (airportCode == null || airportCode.isBlank()) {
+            return List.of();
+        }
+
+        String url = resolveAirportFlightsUrl(airportCode);
         if (url.isBlank()) {
             return List.of();
         }
 
         try {
             HttpRequest request = HttpRequest.newBuilder(URI.create(url))
-                    .header("Authorization", "Bearer " + apiKey)
+                    .header("x-apikey", apiKey)
                     .header("Accept", "application/json")
                     .GET()
                     .timeout(Duration.ofSeconds(8))
@@ -56,44 +66,50 @@ public class FlightAwareClient {
             }
 
             JsonNode root = objectMapper.readTree(response.body());
-            JsonNode routesNode = root.has("routes") ? root.get("routes") : root;
-            if (routesNode == null || !routesNode.isArray()) {
+            JsonNode flightsNode = root.has("flights") ? root.get("flights") : root;
+            if (flightsNode == null || !flightsNode.isArray()) {
                 return List.of();
             }
 
             List<FlightAwareRoute> routes = new ArrayList<>();
-            for (JsonNode node : routesNode) {
-                String originCode = readText(node, "originCode", "origin", "from");
-                String destinationCode = readText(node, "destinationCode", "destination", "to");
-                int distanceKm = readInt(node, "distanceKm", "distance_km", "distance");
-                int durationMinutes = readInt(node, "durationMinutes", "duration_minutes", "duration");
+            for (JsonNode node : flightsNode) {
+                String originCode = readText(node, "origin", "originCode", "from");
+                String destinationCode = readText(node, "destination", "destinationCode", "to");
+                int distanceKm = readInt(node, "distance", "distanceKm", "distance_km");
+                int durationMinutes = readInt(node, "duration", "durationMinutes", "duration_minutes");
+                String flightId = readText(node, "ident", "id", "flightId");
+                String aircraftType = readText(node, "aircrafttype", "aircraftType", "aircraft_type");
 
                 if (originCode == null || destinationCode == null) {
                     continue;
                 }
 
                 routes.add(new FlightAwareRoute(
-                        readText(node, "id", "routeId", "flightId"),
+                        flightId != null ? flightId : originCode + "-" + destinationCode,
                         originCode,
                         destinationCode,
                         distanceKm > 0 ? distanceKm : 1800,
-                        durationMinutes > 0 ? durationMinutes : 120
+                        durationMinutes > 0 ? durationMinutes : 120,
+                        aircraftType,
+                        "FLIGHTAWARE"
                 ));
             }
 
             return routes;
         } catch (Exception ex) {
-            log.warn("FlightAware integration failed: {}", ex.getMessage());
+            log.warn("FlightAware integration failed for airport {}: {}", airportCode, ex.getMessage());
             return List.of();
         }
     }
 
-    private String resolveRoutesUrl() {
+    private String resolveAirportFlightsUrl(String airportCode) {
         if (baseUrl == null || baseUrl.isBlank()) {
             return "";
         }
-        String normalized = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
-        return normalized + "/routes";
+
+        String normalizedBaseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+        String sanitizedAirport = URLEncoder.encode(airportCode.trim().toUpperCase(), StandardCharsets.UTF_8);
+        return normalizedBaseUrl + "/airports/" + sanitizedAirport + "/flights?max_pages=1";
     }
 
     private String readText(JsonNode node, String... keys) {
@@ -122,6 +138,9 @@ public class FlightAwareClient {
         return 0;
     }
 
-    public record FlightAwareRoute(String id, String originCode, String destinationCode, int distanceKm, int durationMinutes) {
+    public record FlightAwareRoute(String id, String originCode, String destinationCode, int distanceKm, int durationMinutes, String aircraftType, String source) {
+        public FlightAwareRoute(String id, String originCode, String destinationCode, int distanceKm, int durationMinutes) {
+            this(id, originCode, destinationCode, distanceKm, durationMinutes, null, "FLIGHTAWARE");
+        }
     }
 }

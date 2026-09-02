@@ -6,6 +6,7 @@ import com.skypilot.backend.aviation.client.FlightAwareClient;
 import com.skypilot.backend.aviation.mapper.FlightAwareMapper;
 import com.skypilot.backend.domain.Airport;
 import com.skypilot.backend.domain.Route;
+import com.skypilot.backend.domain.RouteEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,6 +32,7 @@ public class ExternalFlightDataService {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final FlightAwareClient flightAwareClient;
     private final FlightAwareMapper flightAwareMapper;
+    private final FlightAwareSyncService flightAwareSyncService;
 
     @Value("${aviation.data.provider:demo}")
     private String provider;
@@ -42,8 +44,15 @@ public class ExternalFlightDataService {
     private String apiKey;
 
     public ExternalFlightDataService(FlightAwareClient flightAwareClient, FlightAwareMapper flightAwareMapper) {
+        this(flightAwareClient, flightAwareMapper, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public ExternalFlightDataService(FlightAwareClient flightAwareClient, FlightAwareMapper flightAwareMapper,
+                                    FlightAwareSyncService flightAwareSyncService) {
         this.flightAwareClient = flightAwareClient;
         this.flightAwareMapper = flightAwareMapper;
+        this.flightAwareSyncService = flightAwareSyncService;
     }
 
     public List<Route> fetchRoutes() {
@@ -53,6 +62,25 @@ public class ExternalFlightDataService {
                 List<Route> mappedRoutes = flightAwareMapper.toRoutes(liveRoutes);
                 if (mappedRoutes != null && !mappedRoutes.isEmpty()) {
                     return mappedRoutes;
+                }
+
+                if (flightAwareSyncService != null) {
+                    List<RouteEntity> syncedRoutes = flightAwareSyncService.syncRoutesForAirport("GRU");
+                    if (syncedRoutes != null && !syncedRoutes.isEmpty()) {
+                        return syncedRoutes.stream()
+                                .map(routeEntity -> new Route(
+                                        routeEntity.getExternalId() != null ? routeEntity.getExternalId() : routeEntity.getId(),
+                                        new Airport(routeEntity.getOrigin().getCode(), routeEntity.getOrigin().getCity(), routeEntity.getOrigin().getCountry()),
+                                        new Airport(routeEntity.getDestination().getCode(), routeEntity.getDestination().getCity(), routeEntity.getDestination().getCountry()),
+                                        routeEntity.getDistanceKm(),
+                                        routeEntity.getDurationMinutes(),
+                                        routeEntity.getDataSource().name(),
+                                        routeEntity.getExternalId(),
+                                        routeEntity.getSourceUpdatedAt(),
+                                        routeEntity.getLastSyncedAt()
+                                ))
+                                .toList();
+                    }
                 }
             } catch (Exception ex) {
                 log.warn("External flight data provider failed. Falling back to demo route catalog. Cause: {}", ex.getMessage());
